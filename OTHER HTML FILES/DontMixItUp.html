@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Don't Mix It Up</title>
+    <style>
+        /* Fonts */
+        @font-face { font-family: 'TitleFont'; src: url('GreedyLoudingDemo-6RJMg.otf'); }
+        @font-face { font-family: 'MainFont'; src: url('HugMeTight-GzZq.ttf'); }
+        @font-face { font-family: 'AltFont'; src: url('KidslandAvenue-mLM09.ttf'); }
+
+        :root {
+            --mario-blue: #30a5ff;
+            --mario-yellow: #fbd000;
+            --mario-red: #ff3131;
+            --mario-green: #43ad28;
+            --mario-gray: #a0a0a0;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            font-family: 'MainFont', sans-serif;
+            background: url('background.png') no-repeat center center fixed;
+            background-size: cover; overflow: hidden;
+        }
+
+        #game-container {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; width: 100vw; position: relative;
+        }
+
+        .screen { display: none; flex-direction: column; align-items: center; width: 100%; }
+        .active { display: flex; }
+
+        /* Title Styling */
+        h1 {
+            font-family: 'TitleFont'; font-size: 85px; color: white;
+            text-shadow: 5px 5px 0 var(--mario-red), 10px 10px 0 rgba(0,0,0,0.2);
+            margin: 10px 0; animation: titleBounce 2s infinite ease-in-out;
+        }
+        @keyframes titleBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+
+        /* Buttons */
+        .btn {
+            background: var(--mario-yellow); border: none; padding: 15px 35px;
+            font-family: 'AltFont'; font-size: 22px; border-radius: 50px;
+            box-shadow: 0 6px 0 #c4a100; cursor: pointer; margin: 10px; transition: 0.1s;
+        }
+        .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #c4a100; }
+        
+        .fs-btn { position: absolute; top: 20px; right: 20px; padding: 10px 20px; font-size: 14px; z-index: 100; }
+
+        /* Gameplay Layout */
+        .layout { display: flex; width: 95%; justify-content: space-between; align-items: center; }
+        .side-col { width: 240px; display: flex; flex-direction: column; gap: 20px; }
+
+        .player-card {
+            background: rgba(255, 255, 255, 0.5); border: 4px dashed white;
+            border-radius: 25px; padding: 15px; text-align: center; min-height: 200px;
+            transition: background 0.4s, transform 0.3s;
+        }
+        .player-label { font-family: 'AltFont'; font-size: 20px; color: #333; margin-bottom: 5px; }
+        .points-display { font-family: 'AltFont'; font-size: 18px; color: #d32f2f; }
+
+        .drop-zone {
+            width: 100px; height: 100px; background: rgba(0,0,0,0.1);
+            border-radius: 15px; margin: 10px auto; display: flex; align-items: center; justify-content: center;
+        }
+
+        /* Grid */
+        #card-deck {
+            background: rgba(255, 255, 255, 0.7); padding: 20px; border-radius: 35px;
+            display: grid; grid-template-columns: repeat(6, 110px); gap: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        }
+
+        .card {
+            width: 100px; height: 100px; background: var(--mario-blue);
+            border-radius: 18px; cursor: grab; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 6px 0 #1e6bb3; position: relative;
+        }
+        .card img { width: 85%; height: 85%; object-fit: contain; pointer-events: none; }
+        .card.face-down img { display: none; }
+        .card.face-down::after { content: '?'; color: white; font-size: 40px; font-family: 'TitleFont'; }
+
+        /* Result States */
+        .correct { background: rgba(67, 173, 40, 0.8) !important; transform: scale(1.05); }
+        .incorrect { background: rgba(160, 160, 160, 0.8) !important; }
+
+        /* Bonus Modal */
+        #bonus-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 1000; display: none;
+            justify-content: center; align-items: center;
+        }
+        .bonus-box { background: white; padding: 30px; border-radius: 40px; text-align: center; width: 450px; }
+        .bonus-options { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
+    </style>
+</head>
+<body>
+
+    <button class="btn fs-btn" onclick="toggleFS()">FULLSCREEN</button>
+
+    <div id="game-container">
+        <div id="screen-start" class="screen active">
+            <h1>Don't Mix It Up</h1>
+            <p style="font-family: 'AltFont'; font-size: 24px; color: white;">How many players?</p>
+            <div style="display:flex;">
+                <button class="btn" onclick="setupGame(2)">2 Players</button>
+                <button class="btn" onclick="setupGame(3)">3 Players</button>
+                <button class="btn" onclick="setupGame(4)">4 Players</button>
+            </div>
+        </div>
+
+        <div id="screen-game" class="screen">
+            <div id="msg-bar" style="position:fixed; top:20px; font-size:30px; color:white; text-shadow:2px 2px 0 black; font-family:'AltFont'; z-index:200;"></div>
+            
+            <div class="layout">
+                <div class="side-col">
+                    <div class="player-card" id="p1"><div class="player-label">PLAYER ONE</div><div class="drop-zone" id="dz1"></div><div class="points-display">0</div></div>
+                    <div class="player-card" id="p2"><div class="player-label">PLAYER TWO</div><div class="drop-zone" id="dz2"></div><div class="points-display">0</div></div>
+                </div>
+
+                <div id="card-deck"></div>
+
+                <div class="side-col">
+                    <div class="player-card" id="p3"><div class="player-label">PLAYER THREE</div><div class="drop-zone" id="dz3"></div><div class="points-display">0</div></div>
+                    <div class="player-card" id="p4"><div class="player-label">PLAYER FOUR</div><div class="drop-zone" id="dz4"></div><div class="points-display">0</div></div>
+                </div>
+            </div>
+            
+            <button id="submit-btn" class="btn" style="display:none; margin-top: 30px;" onclick="processRound()">Submit All Cards</button>
+        </div>
+    </div>
+
+    <div id="bonus-modal">
+        <div class="bonus-box">
+            <h2 id="bonus-player-name" style="font-family:'AltFont'; font-size: 30px;">PLAYER ONE</h2>
+            <div id="bonus-img-container" style="margin: 20px 0;"></div>
+            <p style="font-size: 20px;">What is the picture about?</p>
+            <div class="bonus-options" id="bonus-buttons"></div>
+        </div>
+    </div>
+
+    <script>
+        const wordList = ["barbecuing", "camping", "taking photos", "mountain climbing", "cooking", "dancing", "drawing", "going on picnics", "fishing", "playing in a band", "singing", "collecting stamps", "traveling", "playing chess", "playing card games", "reading comics", "playing computer games", "playing with dolls", "surfing the Internet", "watching cartoons", "watching dramas", "reading novels", "solving puzzles", "flying kites"];
+        
+        let playerCount = 2;
+        let roundHobbies = [];
+        let playerTargets = [];
+        let playerSelections = [null, null, null, null];
+        let totalPoints = [0, 0, 0, 0];
+        let bonusIndex = 0;
+
+        function toggleFS() {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        }
+
+        function setupGame(n) {
+            playerCount = n;
+            document.getElementById('screen-start').classList.remove('active');
+            document.getElementById('screen-game').classList.add('active');
+            
+            // Toggle sidebar visibility
+            document.getElementById('p3').style.visibility = n >= 3 ? 'visible' : 'hidden';
+            document.getElementById('p4').style.visibility = n >= 4 ? 'visible' : 'hidden';
+
+            startRound();
+        }
+
+        function startRound() {
+            const deck = document.getElementById('card-deck');
+            const msg = document.getElementById('msg-bar');
+            deck.innerHTML = '';
+            playerSelections = [null, null, null, null];
+            document.getElementById('submit-btn').style.display = 'none';
+
+            // Reset UI colors
+            for(let i=1; i<=4; i++) {
+                document.getElementById(`p${i}`).className = 'player-card';
+                document.getElementById(`dz${i}`).innerHTML = '';
+            }
+
+            // 1. Get 18 random hobbies
+            roundHobbies = [...wordList].sort(() => 0.5 - Math.random()).slice(0, 18);
+
+            // 2. Assign target to each player
+            playerTargets = [];
+            for(let i=0; i<playerCount; i++) {
+                playerTargets.push(roundHobbies[i]);
+            }
+
+            // 3. Show phase (Memorize)
+            msg.innerText = "MEMORIZE YOUR CARD!";
+            renderDeck(false); // Face up
+
+            setTimeout(() => {
+                msg.innerText = "SHUFFLING...";
+                renderDeck(true); // Face down + Shuffled
+                msg.innerText = "FIND YOUR CARD!";
+            }, 4000);
+        }
+
+        function renderDeck(isFaceDown) {
+            const deck = document.getElementById('card-deck');
+            deck.innerHTML = '';
+            
+            let displayOrder = isFaceDown ? [...roundHobbies].sort(() => 0.5 - Math.random()) : roundHobbies;
+
+            displayOrder.forEach(hobby => {
+                const card = document.createElement('div');
+                card.className = 'card' + (isFaceDown ? ' face-down' : '');
+                card.draggable = isFaceDown;
+                card.dataset.hobby = hobby;
+                card.innerHTML = `<img src="hobbiesicon/${hobby}.png">`;
+
+                card.ondragstart = (e) => e.dataTransfer.setData('text', hobby);
+                deck.appendChild(card);
+            });
+
+            setupDropZones();
+        }
+
+        function setupDropZones() {
+            for(let i=1; i<=playerCount; i++) {
+                const dz = document.getElementById(`dz${i}`);
+                dz.ondragover = (e) => e.preventDefault();
+                dz.ondrop = (e) => {
+                    e.preventDefault();
+                    const hobby = e.dataTransfer.getData('text');
+                    if(!playerSelections[i-1]) {
+                        dz.innerHTML = `<img src="hobbiesicon/${hobby}.png" width="85">`;
+                        playerSelections[i-1] = hobby;
+                        // Hide original card
+                        document.querySelector(`[data-hobby="${hobby}"]`).style.visibility = 'hidden';
+                        checkReady();
+                    }
+                };
+            }
+        }
+
+        function checkReady() {
+            if(playerSelections.slice(0, playerCount).every(s => s !== null)) {
+                document.getElementById('submit-btn').style.display = 'block';
+            }
+        }
+
+        function processRound() {
+            bonusIndex = 0;
+            for(let i=0; i<playerCount; i++) {
+                const pCard = document.getElementById(`p${i+1}`);
+                if(playerSelections[i] === playerTargets[i]) {
+                    pCard.classList.add('correct');
+                    totalPoints[i] += 50;
+                } else {
+                    pCard.classList.add('incorrect');
+                    // Show correct answer small
+                    pCard.innerHTML += `<div style="font-size:12px; color:white">Correct: ${playerTargets[i]}</div>`;
+                }
+            }
+            updateScoreDisplay();
+            showBonusModal();
+        }
+
+        function showBonusModal() {
+            if(bonusIndex >= playerCount) {
+                setTimeout(startRound, 3000); // Start next round automatically
+                document.getElementById('bonus-modal').style.display = 'none';
+                return;
+            }
+
+            const modal = document.getElementById('bonus-modal');
+            modal.style.display = 'flex';
+            
+            const pName = `PLAYER ${bonusIndex + 1}`;
+            const hobby = playerSelections[bonusIndex];
+            
+            document.getElementById('bonus-player-name').innerText = pName;
+            document.getElementById('bonus-img-container').innerHTML = `<img src="hobbiesicon/${hobby}.png" width="180" style="border:5px solid var(--mario-blue); border-radius:20px;">`;
+
+            // Choices
+            let choices = [hobby];
+            while(choices.length < 4) {
+                let rand = wordList[Math.floor(Math.random() * wordList.length)];
+                if(!choices.includes(rand)) choices.push(rand);
+            }
+            choices.sort(() => 0.5 - Math.random());
+
+            const btnGrid = document.getElementById('bonus-buttons');
+            btnGrid.innerHTML = '';
+            choices.forEach(choice => {
+                const b = document.createElement('button');
+                b.className = 'btn';
+                b.style.fontSize = '16px';
+                b.innerText = choice;
+                b.onclick = () => {
+                    if(choice === hobby) totalPoints[bonusIndex] += 100;
+                    bonusIndex++;
+                    updateScoreDisplay();
+                    showBonusModal();
+                };
+                btnGrid.appendChild(b);
+            });
+        }
+
+        function updateScoreDisplay() {
+            for(let i=0; i<4; i++) {
+                document.querySelectorAll('.points-display')[i].innerText = totalPoints[i];
+            }
+        }
+    </script>
+</body>
+</html>

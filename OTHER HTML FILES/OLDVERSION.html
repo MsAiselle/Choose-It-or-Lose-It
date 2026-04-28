@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choose It or Lose It</title>
+    <style>
+        @font-face { font-family: 'GreedyLouding'; src: url('GreedyLoudingDemo-6RJMg.otf'); }
+        @font-face { font-family: 'HugMeTight'; src: url('HugMeTight-GzZq.ttf'); }
+
+        :root {
+            --pastel-blue: #AEC6CF;
+            --pastel-green: #B3E5BE;
+            --pastel-red: #FFB7B2;
+            --pastel-purple: #CDB4DB;
+            --pastel-yellow: #FFFFD1;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: sans-serif;
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+
+        #game-container {
+            width: 100vw; height: 100vh;
+            background: url('background.png') no-repeat center center;
+            background-size: 100% 100%;
+            display: flex; flex-direction: column; align-items: center;
+            position: relative;
+        }
+
+        /* Front Page */
+        #front-page {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; height: 100%;
+            z-index: 5;
+        }
+
+        .title { font-family: 'GreedyLouding', sans-serif; font-size: clamp(40px, 8vw, 80px); color: #333; margin-bottom: 20px; text-align: center; }
+        .subtitle { font-family: 'HugMeTight', sans-serif; font-size: 24px; margin-bottom: 10px; }
+
+        .player-options button, .start-btn, .action-btn {
+            padding: 15px 30px; margin: 10px; border: none; border-radius: 15px;
+            cursor: pointer; transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .player-options button { font-family: 'HugMeTight', sans-serif; font-size: 24px; background-color: var(--pastel-blue); }
+        .start-btn { font-family: 'GreedyLouding', sans-serif; font-size: 32px; background-color: var(--pastel-green); display: none; }
+        .selected { border: 4px solid #555 !important; transform: scale(1.05); }
+
+        /* Game Layout */
+        #game-layout { 
+            display: none; width: 100%; height: 100%; 
+            flex-direction: column; align-items: center; 
+            padding: 10px; box-sizing: border-box; 
+        }
+        
+        #deck-area { display: flex; align-items: center; gap: 20px; margin-top: 5px; margin-bottom: 10px; }
+        .card-pile { width: 80px; height: 110px; background: #fff; border-radius: 10px; box-shadow: 3px 3px 10px rgba(0,0,0,0.2); border: 2px solid #333; }
+        .draw-btn { font-family: 'GreedyLouding', sans-serif; font-size: 24px; background-color: var(--pastel-yellow); padding: 8px 30px; cursor: pointer; border-radius: 10px; border: none; }
+
+        #player-columns { 
+            display: flex; justify-content: center; width: 100%; height: 75%; 
+            gap: 10px; margin-bottom: 5px; 
+        }
+        
+        .column {
+            flex: 1; max-width: 320px; background: rgba(255,255,255,0.85); 
+            border-radius: 20px; padding: 15px; display: flex; flex-direction: column; align-items: center;
+            transition: all 0.4s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden; /* Prevent enlargement from bleeding out */
+        }
+
+        .player-name { font-family: 'HugMeTight', sans-serif; font-size: clamp(18px, 2vw, 24px); margin-bottom: 5px; transition: opacity 0.3s; }
+
+        /* Card Container */
+        .card-display { 
+            width: 120px; height: 160px; 
+            perspective: 1000px; 
+            margin-bottom: 10px;
+            transition: transform 0.4s ease, width 0.4s ease, height 0.4s ease;
+            z-index: 2;
+        }
+
+        /* The enlargement class when correct */
+        .card-enlarged {
+            width: 180px;
+            height: 240px;
+            transform: translateY(10px); /* Centers it more visually in the column */
+        }
+
+        .card-inner {
+            position: relative; width: 100%; height: 100%;
+            text-align: center; transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        .flippable { cursor: pointer; }
+        .flipped .card-inner { transform: rotateY(180deg); }
+
+        .card-front, .card-back {
+            position: absolute; width: 100%; height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 10px; border: 2px solid #444;
+            display: flex; align-items: center; justify-content: center;
+            background: white; top: 0; left: 0;
+        }
+
+        .card-back {
+            background-color: var(--pastel-yellow);
+            transform: rotateY(180deg);
+            font-family: Arial, sans-serif; 
+            font-size: 36px; font-weight: bold; color: #d32f2f;
+        }
+
+        .card-img { width: 90%; height: 90%; object-fit: contain; pointer-events: none; }
+        
+        /* Choices */
+        .choices-container { 
+            display: flex; flex-direction: column; 
+            gap: 8px; width: 100%; flex-grow: 1; 
+            justify-content: space-evenly;
+            transition: opacity 0.3s;
+        }
+        
+        .choice-btn { 
+            font-family: "Times New Roman", Times, serif; 
+            font-size: clamp(14px, 1.3vw, 20px); 
+            padding: 10px 5px; 
+            background: #fff; border: 2px solid #ddd; border-radius: 10px; 
+            cursor: pointer; width: 100%;
+            transition: all 0.2s;
+            font-weight: bold;
+            color: #444;
+        }
+        
+        .choice-btn.selected-choice { background: var(--pastel-blue) !important; border-color: #333 !important; }
+
+        /* Status Styles */
+        .correct-glow { box-shadow: 0 0 25px 8px rgba(179, 229, 190, 1); background-color: #f0fff4 !important; }
+        .wrong-gray { filter: grayscale(1); opacity: 0.6; background-color: #f0f0f0 !important; }
+        
+        /* Fade out non-essential elements on correct answer */
+        .column.correct-glow .player-name, 
+        .column.correct-glow .choices-container {
+            opacity: 0.3;
+        }
+
+        .status-msg { font-family: 'GreedyLouding', sans-serif; font-size: 18px; margin-top: 5px; min-height: 24px; text-align: center; color: #333; z-index: 3; }
+
+        /* Footer */
+        #game-footer { display: flex; width: 100%; justify-content: center; position: relative; padding: 10px; height: 60px; align-items: center; }
+        .new-game-btn { position: absolute; right: 20px; font-family: 'GreedyLouding', sans-serif; background: var(--pastel-red); }
+        .fullscreen-btn { position: absolute; left: 20px; top: 20px; font-family: 'GreedyLouding', sans-serif; background: #eee; z-index: 10; font-size: 14px; padding: 8px 15px;}
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <button class="action-btn fullscreen-btn" onclick="toggleFullscreen()">Fullscreen</button>
+
+    <div id="front-page">
+        <div class="title">Choose It or Lose It</div>
+        <div class="subtitle">Choose how many players:</div>
+        <div class="player-options">
+            <button onclick="selectPlayers(2, this)">Two Players</button>
+            <button onclick="selectPlayers(3, this)">Three Players</button>
+            <button onclick="selectPlayers(4, this)">Four Players</button>
+        </div>
+        <button class="start-btn" id="start-btn" onclick="startGame()">Start Button</button>
+    </div>
+
+    <div id="game-layout">
+        <div id="deck-area">
+            <div class="card-pile"></div>
+            <button class="draw-btn" id="draw-btn" onclick="drawCards()">Draw</button>
+        </div>
+
+        <div id="player-columns"></div>
+
+        <div id="game-footer">
+            <button class="action-btn" id="submit-btn" style="display:none; background: var(--pastel-purple); font-family: 'GreedyLouding';" onclick="submitAnswers()">Submit All Answers</button>
+            <button class="action-btn" id="next-btn" style="display:none; background: var(--pastel-green); font-family: 'GreedyLouding';" onclick="nextRound()">Next</button>
+            <button class="action-btn new-game-btn" onclick="location.reload()">New Game</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const hobbyList = [
+        "barbecuing", "camping", "taking photos", "mountain climbing", "cooking", 
+        "dancing", "drawing", "going on picnics", "fishing", "playing in a band", 
+        "singing", "collecting stamps", "traveling", "playing chess", 
+        "playing card games", "reading comics", "playing computer games", 
+        "playing with dolls", "surfing the Internet", "watching cartoons", 
+        "watching dramas", "reading novels", "solving puzzles", "flying kites"
+    ];
+
+    let playerCount = 0;
+    let players = [];
+    const pointValues = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
+
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(e => console.log(e));
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
+    function selectPlayers(count, btn) {
+        playerCount = count;
+        document.querySelectorAll('.player-options button').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById('start-btn').style.display = 'block';
+    }
+
+    function startGame() {
+        document.getElementById('front-page').style.display = 'none';
+        document.getElementById('game-layout').style.display = 'flex';
+        players = [];
+        const container = document.getElementById('player-columns');
+        container.innerHTML = '';
+
+        for (let i = 1; i <= playerCount; i++) {
+            players.push({ id: i, history: [], currentCard: null, selectedAnswer: null, randomPoints: 0 });
+            const col = document.createElement('div');
+            col.className = 'column';
+            col.id = `col-${i}`;
+            col.style.backgroundColor = ['#f0f9ff', '#fffdf0', '#fdfaff', '#fff5f5'][i-1];
+            col.innerHTML = `
+                <div class="player-name">Player ${['One','Two','Three','Four'][i-1]}</div>
+                <div class="card-display" id="card-display-${i}"></div>
+                <div class="status-msg" id="status-${i}"></div>
+                <div class="choices-container" id="choices-${i}"></div>
+            `;
+            container.appendChild(col);
+        }
+    }
+
+    function handleImgError(img, name) {
+        img.style.display = 'none';
+        const fallback = document.createElement('div');
+        fallback.style.padding = '10px';
+        fallback.style.fontSize = '14px';
+        fallback.innerText = `[${name}]`;
+        img.parentNode.appendChild(fallback);
+    }
+
+    function drawCards() {
+        document.getElementById('draw-btn').disabled = true;
+        document.getElementById('draw-btn').style.opacity = '0.5';
+
+        players.forEach(player => {
+            let available = hobbyList.filter(h => !player.history.includes(h));
+            if (available.length === 0) { player.history = []; available = [...hobbyList]; }
+            
+            player.currentCard = available[Math.floor(Math.random() * available.length)];
+            player.history.push(player.currentCard);
+            player.randomPoints = pointValues[Math.floor(Math.random() * pointValues.length)];
+
+            const display = document.getElementById(`card-display-${player.id}`);
+            display.className = 'card-display'; 
+            display.innerHTML = `
+                <div class="card-inner">
+                    <div class="card-front">
+                        <img src="hobbiesicon/${player.currentCard}.png" 
+                             class="card-img" 
+                             onerror="handleImgError(this, '${player.currentCard}')">
+                    </div>
+                    <div class="card-back">${player.randomPoints}</div>
+                </div>
+            `;
+            
+            let choices = [player.currentCard];
+            while(choices.length < 5) {
+                let rand = hobbyList[Math.floor(Math.random() * hobbyList.length)];
+                if(!choices.includes(rand)) choices.push(rand);
+            }
+            choices.sort(() => Math.random() - 0.5);
+
+            const choiceContainer = document.getElementById(`choices-${player.id}`);
+            choiceContainer.innerHTML = '';
+            choices.forEach(choice => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerText = choice;
+                btn.onclick = () => {
+                    player.selectedAnswer = choice;
+                    Array.from(choiceContainer.children).forEach(c => c.classList.remove('selected-choice'));
+                    btn.classList.add('selected-choice');
+                    checkAllSelected();
+                };
+                choiceContainer.appendChild(btn);
+            });
+        });
+    }
+
+    function checkAllSelected() {
+        if (players.every(p => p.selectedAnswer !== null)) {
+            document.getElementById('submit-btn').style.display = 'block';
+        }
+    }
+
+    function submitAnswers() {
+        document.getElementById('submit-btn').style.display = 'none';
+        players.forEach(player => {
+            const col = document.getElementById(`col-${player.id}`);
+            const display = document.getElementById(`card-display-${player.id}`);
+            const status = document.getElementById(`status-${player.id}`);
+            
+            if (player.selectedAnswer === player.currentCard) {
+                col.classList.add('correct-glow');
+                display.classList.add('flippable', 'card-enlarged'); // Enlarge the card!
+                display.onclick = function() {
+                    this.classList.toggle('flipped');
+                };
+                status.innerText = "CORRECT! CLICK CARD!";
+            } else {
+                col.classList.add('wrong-gray');
+                status.innerHTML = `Wrong! Correct answer is: ${player.currentCard}`;
+                display.onclick = null;
+            }
+            Array.from(document.getElementById(`choices-${player.id}`).children).forEach(b => b.disabled = true);
+        });
+        document.getElementById('next-btn').style.display = 'block';
+    }
+
+    function nextRound() {
+        document.getElementById('next-btn').style.display = 'none';
+        document.getElementById('draw-btn').disabled = false;
+        document.getElementById('draw-btn').style.opacity = '1';
+        players.forEach(player => {
+            player.selectedAnswer = null;
+            const col = document.getElementById(`col-${player.id}`);
+            col.classList.remove('correct-glow', 'wrong-gray');
+            const display = document.getElementById(`card-display-${player.id}`);
+            display.innerHTML = '';
+            display.className = 'card-display'; // Reset enlargement
+            display.onclick = null;
+            document.getElementById(`choices-${player.id}`).innerHTML = '';
+            document.getElementById(`status-${player.id}`).innerText = '';
+        });
+    }
+</script>
+</body>
+</html>
